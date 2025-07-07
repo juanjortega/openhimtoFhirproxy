@@ -6,7 +6,7 @@ services:
       context: ./fhir-forwarder
     env_file: ./fhir-forwarder/.env
     ports:
-      - "8000:8000"
+      - "8003:8003"
     restart: unless-stopped
     networks:
       - lacpass-himnet
