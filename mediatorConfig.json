@@ -1,0 +1,35 @@
+{
+  "urn": "urn:mediator:direct-fhir-forwarder",
+  "version": "1.0.0",
+  "name": "Direct FHIR Event Forwarder",
+  "description": "Mediador que reenvía recursos FHIR de OpenMRS via proxy a un nodo nacional FHIR.",
+  "defaultChannelConfig": [
+    {
+      "name": "FHIR Forwarder Channel",
+      "urlPattern": "^/event$",
+      "routes": [
+        {
+          "name": "FHIR Forwarder Route",
+          "host": "0.0.0.0",
+          "path": "/",
+          "port": "8000",
+          "primary": true,
+          "type": "http"
+        }
+      ],
+      "allow": ["admin"],
+      "methods": ["POST"],
+      "type": "http"
+    }
+  ],
+  "endpoints": [
+    {
+      "name": "FHIR Forwarder Endpoint",
+      "host": "0.0.0.0",
+      "path": "/",
+      "port": "8000",
+      "primary": true,
+      "type": "http"
+    }
+  ]
+}
