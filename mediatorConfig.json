@@ -12,7 +12,7 @@
           "name": "FHIR Forwarder Route",
           "host": "0.0.0.0",
           "path": "/",
-          "port": "8000",
+          "port": "8003",
           "primary": true,
           "type": "http"
         }
@@ -27,7 +27,7 @@
       "name": "FHIR Forwarder Endpoint",
       "host": "0.0.0.0",
       "path": "/",
-      "port": "8000",
+      "port": "8003",
       "primary": true,
       "type": "http"
     }
