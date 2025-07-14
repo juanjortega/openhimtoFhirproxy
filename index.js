@@ -96,10 +96,15 @@ async function putToNode(resource) {
 
 app.post('/event', async (req, res) => {
   const { uuid } = req.body
-  if (!uuid) return res.status(400).json({ error: 'Falta uuid' })
-  if (seen.has(uuid)) return res.status(200).json({ status: 'duplicado', uuid })
+  logStep('📩 Recibido POST /event', req.body)
 
-  logStep('🔔 Nuevo evento', uuid)
+  if (!uuid) return res.status(400).json({ error: 'Falta uuid' })
+  if (seen.has(uuid)) {
+    logStep('🔁 Evento duplicado, ignorado', uuid)
+    return res.status(200).json({ status: 'duplicado', uuid })
+  }
+
+  logStep('🔔 Nuevo evento desde feed', uuid)
   seen.add(uuid)
   saveSeen()
 
@@ -107,23 +112,29 @@ app.post('/event', async (req, res) => {
 
   try {
     // 1. Encounter
+    logStep('➡️ Solicitando Encounter desde proxy FHIR', uuid)
     const encounter = await getFromProxy(`/Encounter/${uuid}`)
+    logStep('✅ Recibido Encounter del proxy:', JSON.stringify(encounter, null, 1))
     results.push(await putToNode(encounter))
+    logStep('⬆️ Enviado Encounter al servidor FHIR destino')
 
     // 2. Patient
     const patientId = encounter.subject?.reference?.split('/').pop()
     if (patientId) {
+      logStep('➡️ Solicitando Patient desde proxy FHIR', patientId)
       const patient = await getFromProxy(`/Patient/${patientId}`)
+      logStep('✅ Recibido Patient del proxy:', JSON.stringify(patient, null, 1))
       results.push(await putToNode(patient))
+      logStep('⬆️ Enviado Patient al servidor FHIR destino')
     }
 
-    // 3. Recursos FHIR relacionados según la guía de OpenMRS
+    // 3. Recursos FHIR relacionados
     const resourceQueries = [
       { type: 'Observation', q: `/Observation?encounter=${uuid}` },
       { type: 'Condition', q: `/Condition?encounter=${uuid}` },
       { type: 'Procedure', q: `/Procedure?encounter=${uuid}` },
       { type: 'MedicationRequest', q: `/MedicationRequest?encounter=${uuid}` },
-      { type: 'Medication', q: `/Medication?encounter=${uuid}` }, // si aplica
+      { type: 'Medication', q: `/Medication?encounter=${uuid}` },
       { type: 'AllergyIntolerance', q: `/AllergyIntolerance?encounter=${uuid}` },
       { type: 'DiagnosticReport', q: `/DiagnosticReport?encounter=${uuid}` },
       { type: 'Immunization', q: `/Immunization?encounter=${uuid}` },
@@ -133,22 +144,27 @@ app.post('/event', async (req, res) => {
     ]
     for (const { type, q } of resourceQueries) {
       try {
+        logStep(`➡️ Buscando ${type} desde proxy FHIR:`, q)
         const bundle = await getFromProxy(q)
         if (bundle.entry) {
+          logStep(`✅ Recibido bundle de ${type}:`, `count=${bundle.entry.length}`)
           for (const entry of bundle.entry) {
             if (entry.resource?.resourceType && entry.resource?.id) {
+              logStep(`⬆️ Enviando ${type} (${entry.resource.id}) al servidor FHIR destino`)
               results.push(await putToNode(entry.resource))
             }
           }
+        } else {
+          logStep(`ℹ️ No hay ${type} para este Encounter`)
         }
       } catch (e) {
-        logStep(`No se pudo obtener ${type}:`, e.message)
+        logStep(`❌ No se pudo obtener ${type}:`, e.message)
       }
     }
     logStep('🎉 Proceso completado para', uuid)
     res.json({ status: 'ok', uuid, sent: results.length })
   } catch (err) {
-    logStep('❌ ERROR', err.message)
+    logStep('❌ ERROR en procesamiento:', err.message)
     res.status(500).json({ error: err.message })
   }
 })
